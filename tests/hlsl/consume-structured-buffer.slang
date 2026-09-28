@@ -1,7 +1,7 @@
 //TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-dx12 -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type
 //TEST(compute, vulkan):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-vk -compute -output-using-type -emit-spirv-directly
-//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type
+//TEST(compute):COMPARE_COMPUTE_EX(filecheck-buffer=BUF):-cuda -compute -output-using-type -xslang -DPOINTER_ONLY_BUFFER
 
 //TEST_INPUT:ubuffer(data=[0 0 0 0 0], stride=4):out,name=outputBuffer
 RWStructuredBuffer<float> outputBuffer;
@@ -11,11 +11,19 @@ RWStructuredBuffer<float> outputBuffer;
 //TEST_INPUT:set consumeBuffer = ubuffer(data=[1.0 2.0 3.0 4.0 5.0 6.0 7.0 8.0], stride=4, counter=6)
 ConsumeStructuredBuffer<float> consumeBuffer;
 
+//TEST_INPUT:set bufferCount = 8
+uniform uint bufferCount;
+
 [numthreads(4, 1, 1)]
 void computeMain(uint i : SV_GroupIndex)
 {
     uint size, stride;
+    // CUDA buffer references have no length; the host supplies it explicitly.
+#ifdef POINTER_ONLY_BUFFER
+    size = bufferCount;
+#else
     consumeBuffer.GetDimensions(size, stride);
+#endif
 
     if(i == 0)
         outputBuffer[0] = size;

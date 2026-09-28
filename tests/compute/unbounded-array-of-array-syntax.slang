@@ -1,7 +1,7 @@
 //IGNORE_TEST:CPU_REFLECTION: -profile cs_5_0 -entry computeMain -target cpp
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute
 //TEST:SIMPLE(filecheck=DXIL):-target dxbc-assembly -entry computeMain -profile cs_5_1
-//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -profile cs_5_1
+//TEST:SIMPLE(filecheck=CUDA):-target cuda -entry computeMain -profile cs_5_1 -DPOINTER_ONLY_BUFFER
 //TEST:SIMPLE(filecheck=CHECK):-target spirv-assembly -entry computeMain -profile cs_5_1 -emit-spirv-via-glsl
 //DISABLED_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute
 
@@ -14,6 +14,10 @@ RWStructuredBuffer<int> g_aoa[];
 //TEST_INPUT:ubuffer(data=[1 2 3 4], stride=4):name=g_aoa[0]
 //TEST_INPUT:ubuffer(data=[8 17 34], stride=4):name=g_aoa[1]
 
+//TEST_INPUT:set bufferCounts[0] = 4
+//TEST_INPUT:set bufferCounts[1] = 3
+uniform uint bufferCounts[2];
+
 [numthreads(8, 1, 1)]
 void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 {
@@ -24,8 +28,8 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK-DAG: OpDecorate %[[N2:[a-zA-Z0-9_]+]] NonUniform
     // CHECK-DAG: OpDecorate %[[N3:[a-zA-Z0-9_]+]] NonUniform
     // CHECK-DAG: OpDecorate %[[N4:[a-zA-Z0-9_]+]] NonUniform
-    // CHECK-DAG: OpDecorate %[[B0:[a-zA-Z0-9_]+]] Binding 0
-    // CHECK-DAG: OpDecorate %[[B1:[a-zA-Z0-9_]+]] Binding 1
+    // CHECK-DAG: OpDecorate %[[B0:[a-zA-Z0-9_]+]] Binding 1
+    // CHECK-DAG: OpDecorate %[[B1:[a-zA-Z0-9_]+]] Binding 2
     // CHECK-DAG: %[[P1:[a-zA-Z0-9_]+]] = OpTypePointer Uniform %int
     // CHECK-DAG: %[[P2:[a-zA-Z0-9_]+]] = OpTypePointer Uniform %StructuredBuffer_int_t_0
     // CHECK: %[[N1]] = OpCopyObject %int
@@ -36,8 +40,7 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
     // CHECK: %{{.*}} = OpAccessChain %[[P1]] %[[B0]] %int_{{.*}}
     // CHECK: OpStore %{{.*}} %[[N4]]
     // CUDA: Array<RWStructuredBuffer<int>>  g_aoa_0;
-    // CUDA: globalParams_0->g_aoa_0[index_0 >> int(2)].GetDimensions
-    // CUDA: _S1[index_0 >> int(2)]
+    // CUDA: _S1[baseIndex_0]
     int index = int(dispatchThreadID.x);
     
     int baseIndex = index >> 2;
@@ -47,7 +50,11 @@ void computeMain(uint3 dispatchThreadID : SV_DispatchThreadID)
 
     // Get the size 
     uint bufferCount, bufferStride;
+#ifdef POINTER_ONLY_BUFFER
+    bufferCount = bufferCounts[baseIndex];
+#else
     buffer.GetDimensions(bufferCount, bufferStride);
+#endif
 
     if (innerIndex >= bufferCount)
     {

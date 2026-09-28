@@ -5,6 +5,8 @@
 //TEST(compute):COMPARE_COMPUTE_EX:-cpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-wgpu -compute -shaderobj
 //TEST(compute):COMPARE_COMPUTE_EX:-llvm -compute -shaderobj
+// CUDA buffer references do not carry a length, so exclude synthesized CUDA runs.
+//DISABLE_TEST(compute):COMPARE_COMPUTE_EX:-cuda -compute -shaderobj
 
 struct Thing
 {
